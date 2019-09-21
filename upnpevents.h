@@ -59,7 +59,7 @@ upnp_event_var_change_notify(enum subscriber_service_enum service);
 const char *
 upnpevents_addSubscriber(const char * eventurl,
                          const char * callback, int callbacklen,
-                         int * timeout);
+                         int * timeout, const char * uuid);
 
 int upnpevents_removeSubscriber(const char * sid, int sidlen);
 void upnpevents_removeSubscribers(void);

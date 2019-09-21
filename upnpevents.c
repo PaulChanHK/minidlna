@@ -116,7 +116,7 @@ static uint16_t nsubscribers = 0;
 
 /* create a new subscriber */
 static struct subscriber *
-newSubscriber(const char * eventurl, const char * callback, int callbacklen)
+newSubscriber(const char * eventurl, const char * callback, int callbacklen, const char * uuid)
 {
 	struct subscriber * tmp;
 	if(!eventurl || !callback || !callbacklen)
@@ -134,12 +134,21 @@ newSubscriber(const char * eventurl, const char * callback, int callbacklen)
 	}
 	memcpy(tmp->callback, callback, callbacklen);
 	tmp->callback[callbacklen] = '\0';
-	/* make a dummy uuid */
-	strncpyt(tmp->uuid, uuidvalue, sizeof(tmp->uuid));
-	if( get_uuid_string(tmp->uuid+5) != 0 )
+	if (uuid && strlen(uuid)>0)
 	{
-		tmp->uuid[sizeof(tmp->uuid)-1] = '\0';
-		snprintf(tmp->uuid+37, 5, "%04lx", random() & 0xffff);
+		strncpyt(tmp->uuid, uuid, sizeof(tmp->uuid));
+	}
+	else
+	{
+		/* make a dummy uuid */
+		char *p_port;
+		strncpyt(tmp->uuid, uuidvalue, sizeof(tmp->uuid));
+		get_uuid_string(tmp->uuid + 5);
+		if ( (p_port = strchr(tmp->callback + 7, ':')) != NULL )
+		{
+			tmp->uuid[sizeof(tmp->uuid)-1] = '\0';
+			snprintf(tmp->uuid+37, 5, "%04x", atoi(p_port+1) & 0xffff);
+		}
 	}
 
 	return tmp;
@@ -150,14 +159,14 @@ newSubscriber(const char * eventurl, const char * callback, int callbacklen)
 const char *
 upnpevents_addSubscriber(const char * eventurl,
                          const char * callback, int callbacklen,
-                         int * timeout)
+                         int * timeout, const char * uuid)
 {
 	struct subscriber * tmp;
 	DPRINTF(E_DEBUG, L_HTTP, "addSubscriber(%s, %.*s, %d)\n",
 	       eventurl, callbacklen, callback, *timeout);
 	if (nsubscribers >= MAX_SUBSCRIBERS)
 		return NULL;
-	tmp = newSubscriber(eventurl, callback, callbacklen);
+	tmp = newSubscriber(eventurl, callback, callbacklen, uuid);
 	if(!tmp)
 		return NULL;
 	if(*timeout < 900)
@@ -165,6 +174,8 @@ upnpevents_addSubscriber(const char * eventurl,
 	tmp->timeout = time(NULL) + *timeout;
 	LIST_INSERT_HEAD(&subscriberlist, tmp, entries);
 	nsubscribers++;
+	DPRINTF(E_INFO, L_HTTP, "addSubscriber(%s, %.*s, %d, %s)\n",
+	       eventurl, callbacklen, callback, *timeout, tmp->uuid);
 	upnp_event_create_notify(tmp);
 	return tmp->uuid;
 }

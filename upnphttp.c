@@ -748,6 +748,7 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 {
 	const char * sid;
 	enum event_type type;
+	char tmpbuf[120];
 	DPRINTF(E_DEBUG, L_HTTP, "ProcessHTTPSubscribe %s\n", path);
 	DPRINTF(E_DEBUG, L_HTTP, "Callback '%.*s' Timeout=%d\n",
 		h->req_CallbackLen, h->req_Callback, h->req_Timeout);
@@ -756,12 +757,13 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	type = check_event(h);
 	if (type == E_SUBSCRIBE)
 	{
+ProcessHTTPSubscribe_upnphttp_subscribe:
 		/* - add to the subscriber list
 		 * - respond HTTP/x.x 200 OK 
 		 * - Send the initial event message */
 		/* Server:, SID:; Timeout: Second-(xx|infinite) */
 		sid = upnpevents_addSubscriber(path, h->req_Callback,
-		                               h->req_CallbackLen, &h->req_Timeout);
+		                               h->req_CallbackLen, &h->req_Timeout, h->req_SID);
 		h->respflags = FLAG_TIMEOUT;
 		if (sid)
 		{
@@ -777,6 +779,26 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 		/* subscription renew */
 		if (renewSubscription(h->req_SID, h->req_SIDLen, &h->req_Timeout) < 0)
 		{
+			unsigned short remote_port = 0;
+			const char * service_id = NULL;
+			if (strcmp(path, CONTENTDIRECTORY_EVENTURL)==0)
+			{
+				remote_port = strtoll(h->req_SID + 37, NULL, 16);
+				service_id = "ContentDirectory";
+			}
+			else if(strcmp(path, CONNECTIONMGR_EVENTURL)==0)
+			{
+				remote_port = strtoll(h->req_SID + 37, NULL, 16);
+				service_id = "ConnectionManager";
+			}
+			if (remote_port)
+			{
+				h->req_Callback = tmpbuf;
+				h->req_CallbackLen = snprintf(tmpbuf, sizeof(tmpbuf)-1,
+					"http://%s:%d/%s/urn:upnp-org:serviceId:%s",
+					inet_ntoa(h->clientaddr), remote_port, uuidvalue + 5, service_id);
+				goto ProcessHTTPSubscribe_upnphttp_subscribe;
+			}
 			/* Invalid SID
 			   412 Precondition Failed. If a SID does not correspond to a known,
 			   un-expired subscription, the publisher must respond
