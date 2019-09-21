@@ -956,6 +956,13 @@ callback(void *args, int argc, char **argv, char **azColName)
 				else
 					alt_title = NULL;
 			}
+			else if( passed_args->client == ENetFrontLivingConnect )
+			{
+				if( strcmp(mime+6, "x-pn-realvideo") == 0 )
+				{
+					strcpy(mime+6, "mpeg");
+				}
+			}
 		}
 		else if( *mime == 'a' )
 		{

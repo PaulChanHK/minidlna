@@ -1551,7 +1551,7 @@ SendResp_caption(struct upnphttp * h, char * object)
 		total = h->req_RangeEnd - h->req_RangeStart + 1;
 		strcatf(&str, "Accept-Ranges: bytes\r\n"
 		              "%s: bytes %jd-%jd/%jd\r\n",
-		              "Content-Range",
+		              (h->req_client && h->req_client->type->type == ENetFrontLivingConnect) ? "CONTENT-RANGE" : "Content-Range",
 		              (intmax_t)h->req_RangeStart,
 		              (intmax_t)h->req_RangeEnd, (intmax_t)size);
 	}
@@ -1949,6 +1949,12 @@ SendResp_dlnafile(struct upnphttp *h, char *object)
 				    strcmp(last_file.mime+6, "mpeg") == 0 )
 					strcpy(last_file.mime+6, "divx");
 			}
+			/* ... and LG BDP won't play RM unless we pretend it's a mpeg file */
+			else if( ctype == ENetFrontLivingConnect )
+			{
+				if( strcmp(last_file.mime+6, "x-pn-realvideo") == 0 )
+					strcpy(last_file.mime+6, "mpeg");
+			}
 		}
 		if( result[5] )
 			snprintf(last_file.dlna, sizeof(last_file.dlna), "DLNA.ORG_PN=%s;", result[5]);
@@ -2048,7 +2054,7 @@ SendResp_dlnafile(struct upnphttp *h, char *object)
 		strcatf(&str, "Content-Length: %jd\r\n"
 		              "%s: bytes %jd-%jd/%jd\r\n",
 		              (intmax_t)total,
-		              "Content-Range",
+		              (h->req_client && h->req_client->type->type == ENetFrontLivingConnect) ? "CONTENT-RANGE" : "Content-Range",
 		              (intmax_t)h->req_RangeStart,
 		              (intmax_t)h->req_RangeEnd, (intmax_t)size);
 	}
