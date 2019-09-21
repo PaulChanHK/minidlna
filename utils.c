@@ -377,6 +377,8 @@ mime_to_ext(const char * mime)
 				return "3gp";
 			else if( strncmp(mime+6, "x-tivo-mpeg", 11) == 0 )
 				return "TiVo";
+			else if( strncmp(mime+6, "x-pn-realvideo", 14) == 0 )
+				return "rmvb";
 			break;
 		case 'i':
 			if( strcmp(mime+6, "jpeg") == 0 )
@@ -404,6 +406,7 @@ is_video(const char * file)
 #ifdef TIVO_SUPPORT
 		ends_with(file, ".TiVo") ||
 #endif
+		ends_with(file, ".rm") || ends_with(file, ".rmvb")  ||
 		ends_with(file, ".mov") || ends_with(file, ".3gp"));
 }
 
