@@ -94,6 +94,7 @@ insert_container(const char *item, const char *rootParent, const char *refID, co
 	char *base;
 	int ret = 0;
 
+	DPRINTF(E_DEBUG, L_SCANNER, "Insert Container %s,%s\n", item, class);
 	result = sql_get_text_field(db, "SELECT OBJECT_ID from OBJECTS o "
 					"left join DETAILS d on (o.DETAIL_ID = d.ID)"
 					" where o.PARENT_ID = '%s'"
@@ -392,6 +393,7 @@ insert_directory(const char *name, const char *path, const char *base, const cha
 	char *result, *p;
 	static char last_found[256] = "-1";
 
+	DPRINTF(E_DEBUG, L_SCANNER, "Insert Dir %s\n", path);
 	if( strcmp(base, BROWSEDIR_ID) != 0 )
 	{
 		int found = 0;
@@ -458,6 +460,7 @@ insert_file(const char *name, const char *path, const char *parentID, int object
 	char *objname;
 	media_types mtype = get_media_type(name);
 
+	DPRINTF(E_DEBUG, L_SCANNER, "Insert File %s\n", path);
 	if( mtype == TYPE_IMAGE && (types & TYPE_IMAGE) )
 	{
 		if( is_album_art(name) )
@@ -519,6 +522,7 @@ insert_file(const char *name, const char *path, const char *parentID, int object
 	             "VALUES"
 	             " ('%s%s$%X', '%s%s', '%s', '%s', %lld, '%q')",
 	             base, parentID, object, base, parentID, objectID, class, detailID, objname);
+	DPRINTF(E_INFO, L_SCANNER, "Insert file Done %s,%s\n", path, class);
 
 	insert_containers(objname, path, objectID, class, detailID);
 	free(objname);

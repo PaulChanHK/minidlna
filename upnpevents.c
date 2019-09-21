@@ -206,7 +206,7 @@ upnpevents_removeSubscriber(const char * sid, int sidlen)
 	struct subscriber * sub;
 	if(!sid)
 		return -1;
-	DPRINTF(E_DEBUG, L_HTTP, "removeSubscriber(%.*s)\n",
+	DPRINTF(E_INFO, L_HTTP, "removeSubscriber(%.*s)\n",
 	       sidlen, sid);
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
 		if(memcmp(sid, sub->uuid, 41) == 0) {
@@ -237,6 +237,7 @@ void
 upnp_event_var_change_notify(enum subscriber_service_enum service)
 {
 	struct subscriber * sub;
+	DPRINTF(E_DEBUG, L_HTTP, "upnp_event_var_change_notify(%d)\n", service);
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
 		if(sub->service == service && sub->notify == NULL)
 			upnp_event_create_notify(sub);
@@ -308,7 +309,7 @@ upnp_event_create_notify(struct subscriber *sub)
 	addr.sin_family = AF_INET;
 	inet_aton(obj->addrstr, &addr.sin_addr);
 	addr.sin_port = htons(port);
-	DPRINTF(E_DEBUG, L_HTTP, "%s: '%s' %hu '%s'\n", "upnp_event_notify_connect",
+	DPRINTF(E_INFO, L_HTTP, "%s: '%s' %hu '%s'\n", "upnp_event_notify_connect",
 	       obj->addrstr, port, obj->path);
 	obj->state = EConnecting;
 	if(connect(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -370,7 +371,7 @@ static void upnp_event_prepare(struct upnp_event_notify * obj)
 	                       l, xml);
 	obj->buffersize = obj->tosend;
 	free(xml);
-	DPRINTF(E_DEBUG, L_HTTP, "Sending UPnP Event response:\n%s\n", obj->buffer);
+	DPRINTF(E_DEBUG, L_HTTP, "%s: Event:%d, response:\n%s\n", "upnp_event_prepare", obj->sub->service, obj->buffer);
 	obj->state = ESending;
 }
 
@@ -388,6 +389,7 @@ static void upnp_event_send(struct upnp_event_notify * obj)
 		}
 		obj->sent += i;
 	}
+	DPRINTF(E_DEBUG, L_HTTP, "%s: Event:%d %d/%d\n", "upnp_event_send", obj->sub->service, obj->sent, obj->tosend);
 	if(obj->sent == obj->tosend) {
 		obj->state = EWaitingForResponse;
 		event_module.del(&obj->ev, 0);
@@ -478,6 +480,8 @@ void upnpevents_gc(void)
 	for(sub = subscriberlist.lh_first; sub != NULL; ) {
 		subnext = sub->entries.le_next;
 		if(sub->timeout && curtime > sub->timeout && sub->notify == NULL) {
+			DPRINTF(E_INFO, L_HTTP, "timeoutUnsubscribe(%s, %.*s)\n",
+				   sub->callback, (int)sizeof(sub->uuid)-1, sub->uuid);
 			LIST_REMOVE(sub, entries);
 			nsubscribers--;
 			free(sub);

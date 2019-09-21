@@ -103,8 +103,8 @@ raise_watch_limit(unsigned int limit)
 	FILE *max_watches = fopen("/proc/sys/fs/inotify/max_user_watches", "r+");
 	if (!max_watches)
 		return;
-	if (!limit)
-		fscanf(max_watches, "%u", &limit);
+	if (!limit || 1 != fscanf(max_watches, "%u", &limit))
+		limit = 0;
 	fprintf(max_watches, "%u", next_highest(limit));
 	fclose(max_watches);
 }
@@ -694,7 +694,7 @@ start_inotify(void)
 				snprintf(path_buf, sizeof(path_buf), "%s/%s", get_path_from_wd(event->wd), event->name);
 				if ( event->mask & IN_ISDIR && (event->mask & (IN_CREATE|IN_MOVED_TO)) )
 				{
-					DPRINTF(E_DEBUG, L_INOTIFY,  "The directory %s was %s.\n",
+					DPRINTF(E_INFO, L_INOTIFY,  "The directory %s was %s.\n",
 						path_buf, (event->mask & IN_MOVED_TO ? "moved here" : "created"));
 					monitor_insert_directory(pollfds[0].fd, esc_name, path_buf);
 				}
@@ -703,7 +703,7 @@ start_inotify(void)
 				{
 					if( (event->mask & (IN_MOVED_TO|IN_CREATE)) && (S_ISLNK(st.st_mode) || st.st_nlink > 1) )
 					{
-						DPRINTF(E_DEBUG, L_INOTIFY, "The %s link %s was %s.\n",
+						DPRINTF(E_INFO, L_INOTIFY, "The %s link %s was %s.\n",
 							(S_ISLNK(st.st_mode) ? "symbolic" : "hard"),
 							path_buf, (event->mask & IN_MOVED_TO ? "moved here" : "created"));
 						if( stat(path_buf, &st) == 0 && S_ISDIR(st.st_mode) )
@@ -716,7 +716,7 @@ start_inotify(void)
 						if( (event->mask & IN_MOVED_TO) ||
 						    (sql_get_int_field(db, "SELECT TIMESTAMP from DETAILS where PATH = '%q'", path_buf) != st.st_mtime) )
 						{
-							DPRINTF(E_DEBUG, L_INOTIFY, "The file %s was %s.\n",
+							DPRINTF(E_INFO, L_INOTIFY, "The file %s was %s.\n",
 								path_buf, (event->mask & IN_MOVED_TO ? "moved here" : "changed"));
 							monitor_insert_file(esc_name, path_buf);
 						}
@@ -724,7 +724,7 @@ start_inotify(void)
 				}
 				else if ( event->mask & (IN_DELETE|IN_MOVED_FROM) )
 				{
-					DPRINTF(E_DEBUG, L_INOTIFY, "The %s %s was %s.\n",
+					DPRINTF(E_INFO, L_INOTIFY, "The %s %s was %s.\n",
 						(event->mask & IN_ISDIR ? "directory" : "file"),
 						path_buf, (event->mask & IN_MOVED_FROM ? "moved away" : "deleted"));
 					if ( event->mask & IN_ISDIR )
