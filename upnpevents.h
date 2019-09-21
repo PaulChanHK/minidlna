@@ -59,13 +59,13 @@ upnp_event_var_change_notify(enum subscriber_service_enum service);
 const char *
 upnpevents_addSubscriber(const char * eventurl,
                          const char * callback, int callbacklen,
-                         int timeout);
+                         int * timeout);
 
 int upnpevents_removeSubscriber(const char * sid, int sidlen);
 void upnpevents_removeSubscribers(void);
 void upnpevents_gc(void);
 
-int renewSubscription(const char * sid, int sidlen, int timeout);
+int renewSubscription(const char * sid, int sidlen, int * timeout);
 
 #ifdef USE_MINIUPNPDCTL
 void write_events_details(int s);

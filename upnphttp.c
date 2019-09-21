@@ -155,6 +155,7 @@ ParseHttpHeaders(struct upnphttp * h)
 	char * p;
 	int n;
 	line = h->req_buf;
+	h->req_Timeout = 0;
 	/* TODO : check if req_buf, contentoff are ok */
 	while(line < (h->req_buf + h->req_contentoff))
 	{
@@ -760,7 +761,7 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 		 * - Send the initial event message */
 		/* Server:, SID:; Timeout: Second-(xx|infinite) */
 		sid = upnpevents_addSubscriber(path, h->req_Callback,
-		                               h->req_CallbackLen, h->req_Timeout);
+		                               h->req_CallbackLen, &h->req_Timeout);
 		h->respflags = FLAG_TIMEOUT;
 		if (sid)
 		{
@@ -774,7 +775,7 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	else if (type == E_RENEW)
 	{
 		/* subscription renew */
-		if (renewSubscription(h->req_SID, h->req_SIDLen, h->req_Timeout) < 0)
+		if (renewSubscription(h->req_SID, h->req_SIDLen, &h->req_Timeout) < 0)
 		{
 			/* Invalid SID
 			   412 Precondition Failed. If a SID does not correspond to a known,
@@ -784,9 +785,7 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 		}
 		else
 		{
-			/* A DLNA device must enforce a 5 minute timeout */
 			h->respflags = FLAG_TIMEOUT;
-			h->req_Timeout = 300;
 			h->respflags |= FLAG_SID;
 			BuildResp_upnphttp(h, 0, 0);
 		}
@@ -1177,12 +1176,7 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 							 bodylen);
 	/* Additional headers */
 	if(h->respflags & FLAG_TIMEOUT) {
-		strcatf(&res, "Timeout: Second-");
-		if(h->req_Timeout) {
-			strcatf(&res, "%d\r\n", h->req_Timeout);
-		} else {
-			strcatf(&res, "300\r\n");
-		}
+		strcatf(&res, "Timeout: Second-%d\r\n", h->req_Timeout);
 	}
 	if(h->respflags & FLAG_SID) {
 		strcatf(&res, "SID: %.*s\r\n", h->req_SIDLen, h->req_SID);

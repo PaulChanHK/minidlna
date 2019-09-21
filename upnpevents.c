@@ -150,18 +150,19 @@ newSubscriber(const char * eventurl, const char * callback, int callbacklen)
 const char *
 upnpevents_addSubscriber(const char * eventurl,
                          const char * callback, int callbacklen,
-                         int timeout)
+                         int * timeout)
 {
 	struct subscriber * tmp;
 	DPRINTF(E_DEBUG, L_HTTP, "addSubscriber(%s, %.*s, %d)\n",
-	       eventurl, callbacklen, callback, timeout);
+	       eventurl, callbacklen, callback, *timeout);
 	if (nsubscribers >= MAX_SUBSCRIBERS)
 		return NULL;
 	tmp = newSubscriber(eventurl, callback, callbacklen);
 	if(!tmp)
 		return NULL;
-	if(timeout)
-		tmp->timeout = time(NULL) + timeout;
+	if(*timeout < 900)
+		*timeout = 900;
+	tmp->timeout = time(NULL) + *timeout;
 	LIST_INSERT_HEAD(&subscriberlist, tmp, entries);
 	nsubscribers++;
 	upnp_event_create_notify(tmp);
@@ -170,15 +171,21 @@ upnpevents_addSubscriber(const char * eventurl,
 
 /* renew a subscription (update the timeout) */
 int
-renewSubscription(const char * sid, int sidlen, int timeout)
+renewSubscription(const char * sid, int sidlen, int * timeout)
 {
 	struct subscriber * sub;
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
 		if(memcmp(sid, sub->uuid, 41) == 0) {
-			sub->timeout = (timeout ? time(NULL) + timeout : 0);
+			DPRINTF(E_DEBUG, L_HTTP, "renewSubscription(%s, %.*s, %d) done\n",
+				   sub->callback, sidlen, sid, *timeout);
+			if(*timeout < 900)
+				*timeout = 900;
+			sub->timeout = time(NULL) + *timeout;
 			return 0;
 		}
 	}
+	DPRINTF(E_ERROR, L_HTTP, "renewSubscription(%.*s, %d)\n",
+		   sidlen, sid, *timeout);
 	return -1;
 }
 
