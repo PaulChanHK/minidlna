@@ -33,7 +33,7 @@ typedef uint32_t pix;
 typedef struct {
 	int32_t width;
 	int32_t height;
-	pix     *buf;
+	pix     buf[1];
 } image_s;
 
 void
@@ -46,7 +46,7 @@ int
 image_get_jpeg_resolution(const char * path, int * width, int * height);
 
 image_s *
-image_new_from_jpeg(const char *path, int is_file, const uint8_t *ptr, int size, int scale, int resize);
+image_new_from_jpeg(const char *path, int is_file, const uint8_t *ptr, int size, int scale, int rotate);
 
 image_s *
 image_resize(image_s * src_image, int32_t width, int32_t height);

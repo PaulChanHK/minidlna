@@ -203,11 +203,10 @@ libjpeg_error_handler(j_common_ptr cinfo)
 void
 image_free(image_s *pimage)
 {
-	free(pimage->buf);
 	free(pimage);
 }
 
-pix
+static pix
 get_pix(image_s *pimage, int32_t x, int32_t y)
 {
 	if (x < 0)
@@ -223,7 +222,7 @@ get_pix(image_s *pimage, int32_t x, int32_t y)
 	return(pimage->buf[(y * pimage->width) + x]);
 }
 
-void
+static void
 put_pix_alpha_replace(image_s *pimage, int32_t x, int32_t y, pix col)
 {
 	if((x >= 0) && (y >= 0) && (x < pimage->width) && (y < pimage->height))
@@ -403,19 +402,12 @@ image_new(int32_t width, int32_t height)
 {
 	image_s *vimage;
 
-	if((vimage = (image_s *)malloc(sizeof(image_s))) == NULL)
+	if((vimage = (image_s *)malloc(sizeof(image_s) + width * height * sizeof(pix))) == NULL)
 	{
 		DPRINTF(E_WARN, L_METADATA, "malloc failed\n");
 		return NULL;
 	}
 	vimage->width = width; vimage->height = height;
-
-	if((vimage->buf = (pix *)malloc(width * height * sizeof(pix))) == NULL)
-	{
-		DPRINTF(E_WARN, L_METADATA, "malloc failed\n");
-		free(vimage);
-		return NULL;
-	}
 	return(vimage);
 }
 
@@ -494,7 +486,6 @@ image_new_from_jpeg(const char *path, int is_file, const uint8_t *buf, int size,
 	maxbuf = vimage->width * vimage->height;
 	if(cinfo.output_components == 3)
 	{
-		int rx, ry;
 		ofs = 0;
 		if((ptr = malloc(w * 3 * cinfo.rec_outbuf_height + 16)) == NULL)
 		{
@@ -508,19 +499,51 @@ image_new_from_jpeg(const char *path, int is_file, const uint8_t *buf, int size,
 
 		for(y = 0; y < h; y += cinfo.rec_outbuf_height)
 		{
-			ry = (rotate & (ROTATE_90|ROTATE_180)) ? (y - h + 1) * -1 : y;
+			int ry = (rotate & (ROTATE_90|ROTATE_180)) ? (y - h + 1) * -1 : y;
 			for(i = 0; i < cinfo.rec_outbuf_height; i++)
 			{
 				line[i] = ptr + (w * 3 * i);
 			}
 			jpeg_read_scanlines(&cinfo, line, cinfo.rec_outbuf_height);
+#if 1
+			x = 3 * w * cinfo.rec_outbuf_height;
+			if (rotate == ROTATE_NONE)
+			{
+				int pd = ry * w;
+				for(i = 0, ofs = pd; i < x && ofs < maxbuf; i+=3, ofs++)
+					vimage->buf[ofs] = COL(ptr[i], ptr[i + 1], ptr[i + 2]);
+			}
+			else if (rotate == ROTATE_90)
+			{
+				for(i = 0, ofs = ry; i < x && ofs < maxbuf; i+=3, ofs+=h)
+					vimage->buf[ofs] = COL(ptr[i], ptr[i + 1], ptr[i + 2]);
+			}
+			else if (rotate == ROTATE_180)
+			{
+				int pd = ry * w;
+				for(i = 0, ofs = pd + w - 1; i < x; i+=3, ofs--)
+				{
+					if( ofs < maxbuf )
+						vimage->buf[ofs] = COL(ptr[i], ptr[i + 1], ptr[i + 2]);
+				}
+			}
+			else if (rotate == ROTATE_270)
+			{
+				for(i = 0, ofs = ry + (w - 1)*h; i < x; i+=3, ofs-=h)
+				{
+					if( ofs < maxbuf )
+						vimage->buf[ofs] = COL(ptr[i], ptr[i + 1], ptr[i + 2]);
+				}
+			}
+#else /*0*/
 			for(x = 0; x < w * cinfo.rec_outbuf_height; x++)
 			{
-				rx = (rotate & (ROTATE_180|ROTATE_270)) ? (x - w + 1) * -1 : x;
+				int rx = (rotate & (ROTATE_180|ROTATE_270)) ? (x - w + 1) * -1 : x;
 				ofs = (rotate & (ROTATE_90|ROTATE_270)) ? ry + (rx * h) : rx + (ry * w);
 				if( ofs < maxbuf )
 					vimage->buf[ofs] = COL(ptr[x + x + x], ptr[x + x + x + 1], ptr[x + x + x + 2]);
 			}
+#endif /*0*/
 		}
 		free(ptr);
 	}
@@ -586,10 +609,10 @@ image_upsize(image_s * pdest, image_s * psrc, int32_t width, int32_t height)
 
 	for(vy = 0; vy < height; vy++)
 	{
+		ry = ((vy * psrc->height) / height);
 		for(vx = 0; vx < width; vx++)
 		{
 			rx = ((vx * psrc->width) / width);
-			ry = ((vy * psrc->height) / height);
 			vcol = get_pix(psrc, rx, ry);
 #else
 	pix   vcol,vcol1,vcol2,vcol3,vcol4;
@@ -602,10 +625,10 @@ image_upsize(image_s * pdest, image_s * psrc, int32_t width, int32_t height)
 
 	for(vy = 0;vy < height; vy++)
 	{
+		ry = vy * height_scale;
 		for(vx = 0;vx < width; vx++)
 		{
 			rx = vx * width_scale;
-			ry = vy * height_scale;
 			vcol1 = get_pix(psrc, (int32_t)rx, (int32_t)ry);
 			vcol2 = get_pix(psrc, ((int32_t)rx)+1, (int32_t)ry);
 			vcol3 = get_pix(psrc, (int32_t)rx, ((int32_t)ry)+1);
@@ -652,16 +675,16 @@ image_downsize(image_s * pdest, image_s * psrc, int32_t width, int32_t height)
 
 	for(vy = 0; vy < height; vy++)
 	{
+		ry = ((vy * psrc->height) / height);
+		ry_next = ry + (psrc->width / width);
 		for(vx = 0; vx < width; vx++)
 		{
 
 			rx = ((vx * psrc->width) / width);
-			ry = ((vy * psrc->height) / height);
 
 			red = green = blue = alpha = 0;
 
 			rx_next = rx + (psrc->width / width);
-			ry_next = ry + (psrc->width / width);
 			factor = 0;
 
 			for( j = rx; j < rx_next; j++)
@@ -716,10 +739,10 @@ image_downsize(image_s * pdest, image_s * psrc, int32_t width, int32_t height)
 
 	for(vy = 0;vy < height; vy++)  
 	{
+		ry = vy * height_scale;
 		for(vx = 0;vx < width; vx++)
 		{
 			rx = vx * width_scale;
-			ry = vy * height_scale;
 			vcol = get_pix(psrc, (int32_t)rx, (int32_t)ry);
 
 			red = green = blue = alpha = 0.0;
