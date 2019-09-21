@@ -78,6 +78,7 @@ enum file_types {
 struct media_dir_s {
  	char *path;             /* base path */
  	media_types types;      /* types of files to scan */
+ 	char *force_sort;       /* force sorting string */
  	struct media_dir_s *next;
 };
 

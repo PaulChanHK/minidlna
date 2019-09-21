@@ -639,6 +639,7 @@ init(int argc, char **argv)
 			types = ALL_MEDIA;
 			path = ary_options[i].value;
 			word = strchr(path, ',');
+			string = NULL;
 			if (word && (access(path, F_OK) != 0))
 			{
 				types = 0;
@@ -647,6 +648,11 @@ init(int argc, char **argv)
 					if (*path == ',')
 					{
 						path++;
+						word = strchr(path, ',');
+						if (word) {
+							*word = 0;
+							string = word + 1;
+						}
 						break;
 					}
 					else if (*path == 'A' || *path == 'a')
@@ -671,6 +677,7 @@ init(int argc, char **argv)
 			media_dir = calloc(1, sizeof(struct media_dir_s));
 			media_dir->path = strdup(path);
 			media_dir->types = types;
+			media_dir->force_sort = string ? strdup(string) : NULL;
 			if (media_dirs)
 			{
 				struct media_dir_s *all_dirs = media_dirs;

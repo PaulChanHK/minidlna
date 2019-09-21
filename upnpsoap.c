@@ -601,7 +601,7 @@ parse_sort_criteria(char *sortCriteria, int *error)
 {
 	char *order = NULL;
 	char *item, *saveptr;
-	int i, ret, reverse, title_sorted = 0;
+	int i, ret, reverse, case_end, title_sorted = 0;
 	struct string_s str;
 	*error = 0;
 
@@ -621,6 +621,7 @@ parse_sort_criteria(char *sortCriteria, int *error)
 	for( i = 0; item != NULL; i++ )
 	{
 		reverse=0;
+		case_end=0;
 		if( i )
 			strcatf(&str, ", ");
 		if( *item == '+' )
@@ -636,6 +637,18 @@ parse_sort_criteria(char *sortCriteria, int *error)
 		{
 			DPRINTF(E_ERROR, L_HTTP, "No order specified [%s]\n", item);
 			goto bad_direction;
+		}
+		if( strncasecmp(item, "dir:", 4) == 0 )
+		{
+			strcatf(&str, "CASE WHEN o.CLASS = 'container.storageFolder' THEN ");
+			case_end=1;
+			item+=4;
+		}
+		else if( strncasecmp(item, "fil:", 4) == 0 )
+		{
+			strcatf(&str, "CASE WHEN o.CLASS <> 'container.storageFolder' THEN ");
+			case_end=1;
+			item+=4;
 		}
 		if( strcasecmp(item, "upnp:class") == 0 )
 		{
@@ -673,6 +686,8 @@ parse_sort_criteria(char *sortCriteria, int *error)
 			goto unhandled_order;
 		}
 
+		if (case_end)
+			strcatf(&str, " END");
 		if( reverse )
 			strcatf(&str, " DESC");
 		unhandled_order:
@@ -1462,7 +1477,21 @@ BrowseContentDirectory(struct upnphttp * h, const char * action)
 			else if( args.client == ELGDevice )
 				ret = xasprintf(&orderBy, "order by o.CLASS, d.TITLE");
 			else
-				orderBy = parse_sort_criteria(SortCriteria, &ret);
+			{
+				if (ObjectID && 0 == strncmp(ObjectID, "64$", 3))
+				{
+					struct media_dir_s *media_path;
+					const char * orig_force_sort_criteria = force_sort_criteria;
+					int id_match = atoi(ObjectID + 3);
+					for( media_path = media_dirs; id_match-- && media_path != NULL; media_path = media_path->next ) {}
+					if ( media_path && media_path->force_sort )
+						force_sort_criteria = media_path->force_sort;
+					orderBy = parse_sort_criteria(SortCriteria, &ret);
+					force_sort_criteria = orig_force_sort_criteria;
+				}
+				else
+					orderBy = parse_sort_criteria(SortCriteria, &ret);
+			}
 			if( ret == -1 )
 			{
 				free(orderBy);
