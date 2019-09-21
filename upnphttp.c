@@ -1330,7 +1330,7 @@ start_dlna_header(struct string_s *str, int respcode, const char *tmode, const c
 
 	now = time(NULL);
 	strftime(date, sizeof(date),"%a, %d %b %Y %H:%M:%S GMT" , gmtime(&now));
-	strcatf(str, "HTTP/1.1 %d OK\r\n"
+	strcatf(str, "HTTP/1.1 %d %s\r\n"
 	             "Connection: close\r\n"
 	             "Date: %s\r\n"
 	             "Server: " MINIDLNA_SERVER_STRING "\r\n"
@@ -1338,7 +1338,7 @@ start_dlna_header(struct string_s *str, int respcode, const char *tmode, const c
 	             "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*\r\n"
 	             "transferMode.dlna.org: %s\r\n"
 	             "Content-Type: %s\r\n",
-	             respcode, date, tmode, mime);
+	             respcode, respcode==206 ? "Partial" : "OK", date, tmode, mime);
 }
 
 static int
@@ -1500,10 +1500,11 @@ SendResp_caption(struct upnphttp * h, char * object)
 {
 	char header[512];
 	char *path;
-	off_t size;
+	off_t total, size;
 	long long id;
 	int fd;
 	struct string_s str;
+	char *ctnt_typ, *cap_ext;
 
 	id = strtoll(object, NULL, 10);
 
@@ -1531,13 +1532,38 @@ SendResp_caption(struct upnphttp * h, char * object)
 
 	INIT_STR(str, header);
 
-	start_dlna_header(&str, 200, "Interactive", "smi/caption");
-	strcatf(&str, "Content-Length: %jd\r\n\r\n", (intmax_t)size);
+	if (h->req_RangeEnd == 0 || h->req_RangeEnd >= size)
+		h->req_RangeEnd = size - 1;
+	if (h->req_RangeStart > h->req_RangeEnd)
+		h->req_RangeStart = h->req_RangeEnd;
+	ctnt_typ = "smi/caption";
+	cap_ext = strrchr(path, '.');
+	if (cap_ext)
+	{
+		cap_ext++;
+		if (!strcasecmp(cap_ext,"srt"))
+			ctnt_typ = "text/srt";
+	}
+	start_dlna_header(&str, (h->reqflags & FLAG_RANGE ? 206 : 200), "Interactive", ctnt_typ);
+	total = size;
+	if( h->reqflags & FLAG_RANGE )
+	{
+		total = h->req_RangeEnd - h->req_RangeStart + 1;
+		strcatf(&str, "Accept-Ranges: bytes\r\n"
+		              "%s: bytes %jd-%jd/%jd\r\n",
+		              "Content-Range",
+		              (intmax_t)h->req_RangeStart,
+		              (intmax_t)h->req_RangeEnd, (intmax_t)size);
+	}
+	if( h->req_command != EHead )
+		strcatf(&str, "Content-Length: %jd\r\n\r\n", (intmax_t)total);
+	else
+		strcatf(&str, "\r\n");
 
 	if( send_data(h, str.data, str.off, MSG_MORE) == 0 )
 	{
 		if( h->req_command != EHead )
-			send_file(h, fd, 0, size-1);
+			send_file(h, fd, h->req_RangeStart, h->req_RangeEnd);
 	}
 	close(fd);
 	CloseSocket_upnphttp(h);
@@ -1729,6 +1755,7 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 		Send500(h);
 		return;
 	}
+
 	/* Figure out the best destination resolution we can use */
 	dstw = width;
 	dsth = ((((width<<10)/srcw)*srch)>>10);
@@ -2019,8 +2046,10 @@ SendResp_dlnafile(struct upnphttp *h, char *object)
 
 		total = h->req_RangeEnd - h->req_RangeStart + 1;
 		strcatf(&str, "Content-Length: %jd\r\n"
-		              "Content-Range: bytes %jd-%jd/%jd\r\n",
-		              (intmax_t)total, (intmax_t)h->req_RangeStart,
+		              "%s: bytes %jd-%jd/%jd\r\n",
+		              (intmax_t)total,
+		              "Content-Range",
+		              (intmax_t)h->req_RangeStart,
 		              (intmax_t)h->req_RangeEnd, (intmax_t)size);
 	}
 	else
