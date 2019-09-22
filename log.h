@@ -52,5 +52,8 @@ extern void log_err(int level, enum _log_facility facility, char *fname, int lin
 
 #define DPRINTF(level, facility, fmt, arg...) do { log_err(level, facility, __FILE__, __LINE__, fmt, ##arg); } while (0)
 
+/* prinf for socket defined by M_SKT */
+#define DSKTPF(level, facility, fmt, arg...) do { log_err(level, facility, __FILE__, __LINE__, "[% 5d]" fmt, M_SKT, ##arg); } while (0)
+
 
 #endif /* __ERR_H__ */

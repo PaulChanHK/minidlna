@@ -104,10 +104,15 @@ static void SendResp_thumbnail(struct upnphttp *, char * url);
 static void SendResp_dlnafile(struct upnphttp *, char * url);
 static void Process_upnphttp(struct event *ev);
 
-struct upnphttp * 
+#undef DPRINTF
+#define DPRINTF DSKTPF
+#define M_SKT h->ev.fd
+
+struct upnphttp *
 New_upnphttp(int s)
 {
 	struct upnphttp * ret;
+	struct upnphttp * h;
 	if(s<0)
 		return NULL;
 	ret = (struct upnphttp *)malloc(sizeof(struct upnphttp));
@@ -116,7 +121,9 @@ New_upnphttp(int s)
 	memset(ret, 0, sizeof(struct upnphttp));
 	ret->ev = (struct event ){ .fd = s, .rdwr = EVENT_READ, .process = Process_upnphttp, .data = ret };
 	event_module.add(&ret->ev);
-	return ret;
+	h = ret;
+	DPRINTF(E_DEBUG, L_HTTP, "New_upnphttp\n");
+	return h;
 }
 
 void
@@ -126,7 +133,7 @@ CloseSocket_upnphttp(struct upnphttp * h)
 	event_module.del(&h->ev, EV_FLAG_CLOSING);
 	if(close(h->ev.fd) < 0)
 	{
-		DPRINTF(E_ERROR, L_HTTP, "CloseSocket_upnphttp: close(%d): %s\n", h->ev.fd, strerror(errno));
+		DPRINTF(E_ERROR, L_HTTP, "CloseSocket_upnphttp: %s\n", strerror(errno));
 	}
 	h->ev.fd = -1;
 	h->state = 100;
@@ -1357,6 +1364,9 @@ start_dlna_header(struct string_s *str, int respcode, const char *tmode, const c
 	             respcode, respcode==206 ? "Partial" : "OK", date, tmode, mime);
 }
 
+#undef M_SKT
+#define M_SKT -1
+
 static int
 _open_file(const char *orig_path)
 {
@@ -1396,6 +1406,9 @@ _open_file(const char *orig_path)
 
 	return fd;
 }
+
+#undef M_SKT
+#define M_SKT h->ev.fd
 
 static void
 SendResp_icon(struct upnphttp * h, char * icon)
